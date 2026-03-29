@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>ATSA Memory Trainer</title>
+  <style>
+    body { background:black; color:white; text-align:center; font-family:Arial; }
+    #grid { display:grid; gap:5px; justify-content:center; margin-top:20px; }
+    .cell { width:50px; height:50px; background:#222; cursor:pointer; }
+    .active { background:yellow; }
+    .selected { background:lime; }
+    button { margin:10px; padding:8px 16px; }
+  </style>
+</head>
+
+<body>
+
+<h2>ATSA Memory Trainer</h2>
+
+<label>
+  <input type="checkbox" id="advancedToggle"> Advanced Mode (6x6, 7x7)
+</label>
+
+<div id="info"></div>
+<div id="grid"></div>
+
+<h3 id="feedback"></h3>
+<h3 id="final"></h3>
+
+<button onclick="replayPattern()">Replay Pattern</button>
+
+<script>
+
+// ================= SETTINGS =================
+let baseLevels = [
+  {size:3, count:2},
+  {size:3, count:3},
+  {size:4, count:4},
+  {size:5, count:5}
+];
+
+let advancedLevels = [
+  {size:6, count:6},
+  {size:7, count:7}
+];
+
+let levels = [];
+
+let levelIndex = 0;
+let round = 1;
+let totalRounds = 30;
+
+let streakCorrect = 0;
+let streakWrong = 0;
+
+let correctCells = [];
+let userCells = [];
+
+let allowInput = false;
+
+// scoring
+let correctCount = 0;
+let maxLevelReached = 0;
+let streakBreaks = 0;
+
+// ================= INIT =================
+initLevels();
+startRound();
+
+function initLevels(){
+  let advanced = document.getElementById("advancedToggle").checked;
+  levels = [...baseLevels];
+
+  if(advanced){
+    levels = [...levels, ...advancedLevels];
+  }
+}
+
+// ================= START =================
+function startRound(){
+
+  if(round > totalRounds){
+    endTest();
+    return;
+  }
+
+  let level = levels[levelIndex];
+  let grid = document.getElementById("grid");
+
+  grid.innerHTML = "";
+  userCells = [];
+  correctCells = [];
+
+  grid.style.gridTemplateColumns = `repeat(${level.size}, 50px)`;
+
+  for(let i=0;i<level.size*level.size;i++){
+    let cell = document.createElement("div");
+    cell.className = "cell";
+    cell.dataset.index = i;
+
+    cell.onclick = function(){
+      if(!allowInput) return;
+
+      let idx = parseInt(cell.dataset.index);
+
+      if(userCells.includes(idx)){
+        userCells = userCells.filter(x=>x!==idx);
+        cell.classList.remove("selected");
+      } else {
+        userCells.push(idx);
+        cell.classList.add("selected");
+      }
+    };
+
+    grid.appendChild(cell);
+  }
+
+  // generate pattern
+  while(correctCells.length < level.count){
+    let r = Math.floor(Math.random()*(level.size*level.size));
+    if(!correctCells.includes(r)) correctCells.push(r);
+  }
+
+  updateInfo();
+  showPattern();
+}
+
+// ================= SHOW =================
+function showPattern(){
+  let grid = document.getElementById("grid");
+
+  correctCells.forEach(i=>{
+    grid.children[i].classList.add("active");
+  });
+
+  setTimeout(()=>{
+    correctCells.forEach(i=>{
+      grid.children[i].classList.remove("active");
+    });
+
+    allowInput = true;
+
+    setTimeout(checkAnswer, 5000);
+
+  }, 1200);
+}
+
+// ================= REPLAY =================
+function replayPattern(){
+  if(allowInput) return;
+  showPattern();
+}
+
+// ================= CHECK =================
+function checkAnswer(){
+  allowInput = false;
+
+  let correct = (
+    userCells.length === correctCells.length &&
+    userCells.every(x => correctCells.includes(x))
+  );
+
+  if(correct){
+    correctCount++;
+    streakCorrect++;
+    if(streakWrong > 0) streakBreaks++;
+    streakWrong = 0;
+    document.getElementById("feedback").innerText = "Correct";
+  } else {
+    streakWrong++;
+    if(streakCorrect > 0) streakBreaks++;
+    streakCorrect = 0;
+    document.getElementById("feedback").innerText = "Wrong";
+  }
+
+  // level progression (4 streak)
+  if(streakCorrect >= 4 && levelIndex < levels.length - 1){
+    levelIndex++;
+    streakCorrect = 0;
+  }
+
+  if(levelIndex > maxLevelReached){
+    maxLevelReached = levelIndex;
+  }
+
+  round++;
+
+  setTimeout(startRound, 500);
+}
+
+// ================= INFO =================
+function updateInfo(){
+  document.getElementById("info").innerText =
+    `Round ${round}/30 | Grid ${levels[levelIndex].size}x${levels[levelIndex].size}`;
+}
+
+// ================= END =================
+function endTest(){
+
+  document.getElementById("grid").innerHTML = "";
+
+  let accuracy = correctCount / totalRounds;
+
+  let levelScore = (maxLevelReached + 1) / levels.length;
+  let stability = 1 - (streakBreaks / totalRounds);
+
+  let finalScore = Math.round(
+    (accuracy * 50) +
+    (levelScore * 30) +
+    (stability * 20)
+  );
+
+  let rating = "";
+  let message = "";
+
+  if(finalScore >= 85){
+    rating = "Strong Hire Range";
+    message = "Excellent memory and consistency under pressure.";
+  }
+  else if(finalScore >= 70){
+    rating = "Competitive";
+    message = "Solid performance, but some inconsistency at higher levels.";
+  }
+  else{
+    rating = "Needs Improvement";
+    message = "Focus on consistency and higher grid recall.";
+  }
+
+  document.getElementById("final").innerText =
+    `Score: ${finalScore} | Rating: ${rating}
+     Accuracy: ${(accuracy*100).toFixed(0)}%
+     Max Grid: ${levels[maxLevelReached].size}x${levels[maxLevelReached].size}
+     ${message}`;
+}
+
+</script>
+
+</body>
+</html>
